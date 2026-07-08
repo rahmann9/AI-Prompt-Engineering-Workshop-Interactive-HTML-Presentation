@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prompt Engineering: Getting Better Results from AI</title>
+<style>
+/* ===== CSS Variables ===== */
+:root {
+  --bg-deep: #080E1A;
+  --bg: #0D1526;
+  --bg-card: #141E36;
+  --bg-card-alt: #1A2844;
+  --primary: #6C8EFF;
+  --primary-dim: rgba(108,142,255,0.15);
+  --secondary: #A78BFA;
+  --secondary-dim: rgba(167,139,250,0.12);
+  --accent: #F5A623;
+  --accent-dim: rgba(245,166,35,0.12);
+  --success: #34D399;
+  --success-dim: rgba(52,211,153,0.12);
+  --danger: #F87171;
+  --danger-dim: rgba(248,113,113,0.12);
+  --text: #F1F5F9;
+  --text-sec: #94A3B8;
+  --text-muted: #5A6A8A;
+  --border: #1E3055;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  --transition: 0.3s ease;
+}
+
+/* ===== Reset ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 18px; scroll-behavior: smooth; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg-deep);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  line-height: 1.6;
+}
+
+/* ===== App Layout ===== */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+}
+
+/* ===== Progress Bar ===== */
+#progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  z-index: 100;
+}
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  transition: width 0.4s ease;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ===== TOC Sidebar ===== */
+#toc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+#toc-overlay.active { opacity: 1; pointer-events: all; }
+#toc-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 340px;
+  max-width: 85vw;
+  height: 100vh;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  z-index: 210;
+  transform: translateX(-100%);
+  transition: transform 0.35s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#toc-sidebar.active { transform: translateX(0); }
+#toc-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+#toc-header h2 { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+#toc-close {
+  background: none; border: none; color: var(--text-sec); cursor: pointer;
+  font-size: 1.4rem; padding: 4px 8px; border-radius: var(--radius-sm);
+  transition: color var(--transition), background var(--transition);
+}
+#toc-close:hover { color: var(--text); background: var(--primary-dim); }
+#toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 0;
+  list-style: none;
+}
+#toc-list li { padding: 0; }
+#toc-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  color: var(--text-sec);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  border-left: 3px solid transparent;
+  font-family: inherit;
+  line-height: 1.4;
+}
+#toc-list button:hover { color: var(--text); background: var(--primary-dim); }
+#toc-list button.active {
+  color: var(--primary);
+  border-left-color: var(--primary);
+  background: var(--primary-dim);
+  font-weight: 600;
+}
+#toc-list .toc-section {
+  padding: 14px 20px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* ===== Slide Area ===== */
+#slide-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 60px 80px;
+}
+/* Decorative background blobs */
+#slide-area::before {
+  content: '';
+  position: absolute;
+  top: -15%;
+  right: -8%;
+  width: 55%;
+  height: 55%;
+  background: radial-gradient(circle, rgba(108,142,255,0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+#slide-area::after {
+  content: '';
+  position: absolute;
+  bottom: -10%;
+  left: -8%;
+  width: 45%;
+  height: 45%;
+  background: radial-gradient(circle, rgba(245,166,35,0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#slide-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1100px;
+  max-height: 100%;
+  overflow-y: auto;
+  transition: opacity 0.32s ease, transform 0.32s ease;
+  opacity: 1;
+  transform: translateX(0);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#slide-content.exit-left { opacity: 0; transform: translateX(-50px); }
+#slide-content.exit-right { opacity: 0; transform: translateX(50px); }
+#slide-content.enter-left { opacity: 0; transform: translateX(-50px); }
+#slide-content.enter-right { opacity: 0; transform: translateX(50px); }
+
+/* ===== Staggered entrance animation ===== */
+.stagger > * {
+  opacity: 0;
+  animation: fadeUp 0.45s ease forwards;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.06s; }
+.stagger > *:nth-child(2) { animation-delay: 0.12s; }
+.stagger > *:nth-child(3) { animation-delay: 0.18s; }
+.stagger > *:nth-child(4) { animation-delay: 0.24s; }
+.stagger > *:nth-child(5) { animation-delay: 0.30s; }
+.stagger > *:nth-child(6) { animation-delay: 0.36s; }
+.stagger > *:nth-child(7) { animation-delay: 0.42s; }
+.stagger > *:nth-child(8) { animation-delay: 0.48s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Navigation Bar ===== */
+#nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background: rgba(13,21,38,0.92);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 90;
+}
+.nav-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-sec);
+  padding: 8px 18px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-btn:hover { background: var(--primary-dim); color: var(--primary); border-color: var(--primary); }
+.nav-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.nav-btn:disabled:hover { background: var(--bg-card); color: var(--text-sec); border-color: var(--border); }
+#slide-counter {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 80px;
+  text-align: center;
+}
+#nav-controls { display: flex; gap: 6px; }
+.ctrl-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-sec);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+.ctrl-btn:hover { background: var(--primary-dim); color: var(--primary); border-color: var(--primary); }
+.ctrl-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ctrl-btn.active { background: var(--primary-dim); color: var(--primary); border-color: var(--primary); }
+
+/* ===== Speaker Notes ===== */
+#speaker-notes {
+  position: fixed;
+  bottom: 60px;
+  left: 0;
+  width: 100%;
+  max-height: 0;
+  background: rgba(13,21,38,0.96);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  transition: max-height 0.4s ease, padding 0.4s ease;
+  z-index: 85;
+  padding: 0 24px;
+}
+#speaker-notes.open { max-height: 200px; padding: 16px 24px; overflow-y: auto; }
+#notes-header {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+#notes-content { font-size: 0.85rem; color: var(--text-sec); line-height: 1.6; }
+
+/* ===== Typography ===== */
+.slide-title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 24px;
+  line-height: 1.2;
+  color: var(--text);
+}
+.slide-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-sec);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.slide-topic {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.slide-topic::before {
+  content: '';
+  width: 4px;
+  height: 22px;
+  background: var(--primary);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+p { margin-bottom: 12px; color: var(--text-sec); }
+ul, ol { padding-left: 24px; margin-bottom: 12px; color: var(--text-sec); }
+li { margin-bottom: 6px; }
+strong { color: var(--text); font-weight: 700; }
+em { color: var(--primary); font-style: italic; }
+code {
+  background: var(--bg-card-alt);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  color: var(--accent);
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* ===== Cards ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 14px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.card:hover { border-color: rgba(108,142,255,0.3); box-shadow: 0 2px 16px rgba(108,142,255,0.06); }
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+.card-accent {
+  border-left: 4px solid var(--primary);
+}
+.card-accent-warn {
+  border-left: 4px solid var(--accent);
+}
+.card-accent-success {
+  border-left: 4px solid var(--success);
+}
+.card-accent-danger {
+  border-left: 4px solid var(--danger);
+}
+
+/* ===== Prompt Compare Blocks ===== */
+.prompt-compare { margin-bottom: 8px; }
+.prompt-card {
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  position: relative;
+}
+.prompt-card .card-label {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 10px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+}
+.prompt-card.weak {
+  background: var(--danger-dim);
+  border: 1px solid rgba(248,113,113,0.2);
+}
+.prompt-card.weak .card-label { background: rgba(248,113,113,0.2); color: var(--danger); }
+.prompt-card.weak p { color: var(--text-sec); font-style: italic; }
+.prompt-card.improved {
+  background: var(--success-dim);
+  border: 1px solid rgba(52,211,153,0.2);
+}
+.prompt-card.improved .card-label { background: rgba(52,211,153,0.2); color: var(--success); }
+.prompt-card p { margin: 0; line-height: 1.55; font-size: 0.95rem; }
+.why-box {
+  background: var(--primary-dim);
+  border: 1px solid rgba(108,142,255,0.2);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+.why-box strong { color: var(--primary); }
+.why-box p { margin: 0; font-size: 0.9rem; }
+
+/* ===== Reveal Button ===== */
+.reveal-btn {
+  background: var(--bg-card-alt);
+  border: 1px dashed var(--border);
+  color: var(--primary);
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  width: 100%;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.reveal-btn:hover { background: var(--primary-dim); border-color: var(--primary); border-style: solid; }
+.reveal-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.reveal-hidden { display: none; }
+.reveal-hidden.revealed {
+  display: block;
+  animation: fadeUp 0.4s ease forwards;
+}
+
+/* ===== Expandable Sections ===== */
+.expandable { margin-bottom: 10px; border-radius: var(--radius); overflow: hidden; }
+.expand-trigger {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  transition: all var(--transition);
+}
+.expand-trigger:hover { background: var(--bg-card-alt); border-color: var(--primary); }
+.expand-trigger:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.expand-trigger .arrow {
+  transition: transform var(--transition);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.expand-trigger.active { border-color: var(--primary); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.expand-trigger.active .arrow { transform: rotate(180deg); color: var(--primary); }
+.expand-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, padding 0.3s ease;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 0 18px;
+}
+.expand-body.open { max-height: 500px; padding: 14px 18px; }
+.expand-body p, .expand-body ul, .expand-body ol { font-size: 0.9rem; }
+.expand-body code { font-size: 0.82rem; }
+
+/* ===== Title Slide ===== */
+.title-slide {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+.title-slide .main-title {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent), var(--primary));
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradShift 8s ease-in-out infinite;
+}
+@keyframes gradShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.title-slide .subtitle {
+  font-size: 1.2rem;
+  color: var(--text-sec);
+  font-weight: 400;
+  max-width: 550px;
+  line-height: 1.5;
+}
+.title-slide .title-decor {
+  width: 80px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  border-radius: 2px;
+  margin: 28px auto 0;
+}
+
+/* ===== Anatomy Diagram ===== */
+.anatomy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+}
+.anatomy-item {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: all var(--transition);
+}
+.anatomy-item:hover { border-color: rgba(108,142,255,0.35); transform: translateX(4px); }
+.anatomy-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  color: #fff;
+}
+.anatomy-icon.goal { background: linear-gradient(135deg, #6C8EFF, #4A6FE0); }
+.anatomy-icon.context { background: linear-gradient(135deg, #A78BFA, #8B5CF6); }
+.anatomy-icon.audience { background: linear-gradient(135deg, #F5A623, #E08D0D); }
+.anatomy-icon.constraints { background: linear-gradient(135deg, #F87171, #DC2626); }
+.anatomy-icon.format { background: linear-gradient(135deg, #34D399, #059669); }
+.anatomy-text h3 { margin-bottom: 4px; font-size: 1rem; }
+.anatomy-text p { margin: 0; font-size: 0.88rem; color: var(--text-sec); }
+
+/* ===== Technique Badges ===== */
+.tech-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: 6px;
+  margin-bottom: 4px;
+}
+.badge-basic { background: var(--primary-dim); color: var(--primary); }
+.badge-intermediate { background: var(--secondary-dim); color: var(--secondary); }
+.badge-advanced { background: var(--accent-dim); color: var(--accent); }
+
+/* ===== Cheat Sheet ===== */
+.cheat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+.cheat-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  transition: all var(--transition);
+}
+.cheat-item:hover { transform: translateY(-3px); border-color: var(--primary); box-shadow: 0 6px 20px rgba(108,142,255,0.1); }
+.cheat-letter {
+  font-size: 2.2rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.cheat-letter.l-g { color: var(--primary); }
+.cheat-letter.l-c { color: var(--secondary); }
+.cheat-letter.l-a { color: var(--accent); }
+.cheat-letter.l-c2 { color: var(--danger); }
+.cheat-letter.l-f { color: var(--success); }
+.cheat-letter.l-f2 { color: #60A5FA; }
+.cheat-word { font-size: 0.85rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.cheat-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; }
+
+/* ===== Closing Slide ===== */
+.closing-slide {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 55vh;
+}
+.takeaway-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  text-align: left;
+  margin-bottom: 18px;
+  max-width: 600px;
+}
+.takeaway-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.takeaway-text { font-size: 1.05rem; color: var(--text-sec); line-height: 1.5; padding-top: 4px; }
+.closing-quote {
+  margin-top: 30px;
+  padding: 20px 30px;
+  border-left: 4px solid var(--accent);
+  background: var(--accent-dim);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  max-width: 650px;
+}
+.closing-quote p {
+  font-size: 1.1rem;
+  color: var(--accent);
+  font-weight: 600;
+  font-style: italic;
+  margin: 0;
+}
+
+/* ===== Mistake Cards ===== */
+.mistake-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--danger-dim);
+  border: 1px solid rgba(248,113,113,0.15);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+.mistake-x {
+  color: var(--danger);
+  font-weight: 900;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.mistake-item p { margin: 0; font-size: 0.92rem; }
+
+/* ===== Progressive Example ===== */
+.progressive-steps { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+.prog-step {
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  position: relative;
+}
+.prog-step .step-num {
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  background: var(--bg);
+  padding: 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 4px;
+}
+.prog-step.step-1 { background: var(--danger-dim); border-color: rgba(248,113,113,0.2); }
+.prog-step.step-1 .step-num { color: var(--danger); }
+.prog-step.step-2 { background: var(--accent-dim); border-color: rgba(245,166,35,0.2); }
+.prog-step.step-2 .step-num { color: var(--accent); }
+.prog-step.step-3 { background: var(--success-dim); border-color: rgba(52,211,153,0.2); }
+.prog-step.step-3 .step-num { color: var(--success); }
+.prog-step p { margin: 0; font-size: 0.95rem; }
+.prog-step .step-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 6px; }
+
+/* ===== Exercise Slide ===== */
+.exercise-prompt {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.exercise-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.exercise-prompt p { margin: 0; font-style: italic; color: var(--text-sec); }
+
+/* ===== Two Column ===== */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 12px 0;
+}
+
+/* ===== Highlight Text ===== */
+.hl { color: var(--primary); font-weight: 700; }
+.hl-warn { color: var(--accent); font-weight: 700; }
+.hl-ok { color: var(--success); font-weight: 700; }
+.hl-bad { color: var(--danger); font-weight: 700; }
+
+/* ===== Dividers ===== */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 20px 0;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  html { font-size: 16px; }
+  #slide-area { padding: 24px 20px 80px; }
+  .slide-title { font-size: 1.5rem; }
+  .title-slide .main-title { font-size: 2rem; }
+  .two-col { grid-template-columns: 1fr; }
+  .cheat-grid { grid-template-columns: repeat(2, 1fr); }
+  .card-grid { grid-template-columns: 1fr; }
+  .anatomy-item { padding: 12px; }
+  .anatomy-icon { width: 40px; height: 40px; font-size: 1.1rem; }
+}
+@media (max-width: 480px) {
+  .cheat-grid { grid-template-columns: 1fr 1fr; }
+  .nav-btn { padding: 8px 12px; font-size: 0.8rem; }
+}
+
+/* ===== Fullscreen adjustments ===== */
+:fullscreen #app, :-webkit-full-screen #app {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ===== Reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== Scrollbar ===== */
+#slide-content::-webkit-scrollbar { width: 6px; }
+#slide-content::-webkit-scrollbar-track { background: transparent; }
+#slide-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+#slide-content::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+#toc-list::-webkit-scrollbar { width: 4px; }
+#toc-list::-webkit-scrollbar-track { background: transparent; }
+#toc-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ===== Focus visible ===== */
+*:focus { outline: none; }
+*:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ===== SVG Icons inline helper ===== */
+.icon-svg { width: 18px; height: 18px; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Progress Bar -->
+  <div id="progress-bar" role="progressbar" aria-label="Presentation progress"><div id="progress-fill"></div></div>
+
+  <!-- TOC Overlay -->
+  <div id="toc-overlay" aria-hidden="true"></div>
+
+  <!-- TOC Sidebar -->
+  <nav id="toc-sidebar" role="navigation" aria-label="Table of contents">
+    <div id="toc-header">
+      <h2>Table of Contents</h2>
+      <button id="toc-close" aria-label="Close table of contents">&times;</button>
+    </div>
+    <ul id="toc-list" role="list"></ul>
+  </nav>
+
+  <!-- Slide Area -->
+  <main id="slide-area" role="main" aria-live="polite">
+    <div id="slide-content"></div>
+  </main>
+
+  <!-- Navigation Bar -->
+  <footer id="nav-bar" role="navigation" aria-label="Slide navigation">
+    <button class="nav-btn" id="btn-prev" aria-label="Previous slide">
+      <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back
+    </button>
+    <span id="slide-counter" aria-live="polite">1 / 36</span>
+    <div id="nav-controls">
+      <button class="ctrl-btn" id="btn-toc" aria-label="Open table of contents" title="Table of Contents">
+        <svg class="icon-svg" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <button class="ctrl-btn" id="btn-notes" aria-label="Toggle speaker notes" title="Speaker Notes">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </button>
+      <button class="ctrl-btn" id="btn-fullscreen" aria-label="Toggle fullscreen" title="Fullscreen">
+        <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+    </div>
+    <button class="nav-btn" id="btn-next" aria-label="Next slide">
+      Next
+      <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  </footer>
+
+  <!-- Speaker Notes -->
+  <div id="speaker-notes" aria-label="Speaker notes">
+    <div id="notes-header">Speaker Notes</div>
+    <div id="notes-content"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   SLIDE DATA
+   ============================================================ */
+const slides = [
+
+  // ---- SLIDE 1: Title ----
+  {
+    title: "Title",
+    section: "Introduction",
+    content: `
+      <div class="title-slide stagger">
+        <div class="main-title">Prompt Engineering:<br>Getting Better Results from AI</div>
+        <div class="subtitle">How to communicate effectively with Large Language Models</div>
+        <div class="title-decor"></div>
+      </div>`,
+    notes: "Welcome everyone to our second class. Today we go beyond basic prompting and learn structured techniques to get consistently better results from AI. This is a practical, hands-on session."
+  },
+
+  // ---- SLIDE 2: Learning Objectives ----
+  {
+    title: "Learning Objectives",
+    section: "Introduction",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">What You Will Learn Today</div>
+        <ul style="font-size:1.05rem; line-height:2;">
+          <li>Why prompts matter more than you think</li>
+          <li>How to <strong>structure</strong> better prompts</li>
+          <li>How to <strong>improve</strong> AI responses systematically</li>
+          <li>How to <strong>iterate</strong> with AI as a conversation partner</li>
+          <li>Practical prompting <strong>techniques</strong> you can use today</li>
+          <li>Common <strong>mistakes</strong> to avoid</li>
+          <li>Real-world uses tailored to <strong>your</strong> daily life</li>
+        </ul>
+      </div>`,
+    notes: "Walk through each objective briefly. Emphasize that this class is practical — every concept comes with examples they can relate to. Ask if anyone has specific prompting frustrations they want addressed."
+  },
+
+  // ---- SLIDE 3: Quick Review ----
+  {
+    title: "Quick Review",
+    section: "Introduction",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Quick Review from Last Class</div>
+        <div class="card-grid">
+          <div class="card card-accent">
+            <h3>LLM Basics</h3>
+            <p>Large Language Models predict the next word based on patterns learned from vast amounts of text.</p>
+          </div>
+          <div class="card card-accent">
+            <h3>Tokens</h3>
+            <p>Text is broken into tokens (words or parts of words). This is how AI "reads" and "writes."</p>
+          </div>
+          <div class="card card-accent">
+            <h3>Transformers</h3>
+            <p>The architecture that lets AI understand context by weighing the importance of each word relative to others.</p>
+          </div>
+          <div class="card card-accent">
+            <h3>AI Models</h3>
+            <p>Proprietary (ChatGPT, Claude) vs. open-source (Llama). Each has different strengths.</p>
+          </div>
+          <div class="card card-accent" style="grid-column: 1 / -1;">
+            <h3>Basic Prompting</h3>
+            <p>You already know how to type a question and get an answer. Today we learn to do it <strong>well</strong>.</p>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <p style="text-align:center; font-size:1.1rem; color:var(--primary); font-weight:700;">
+          Prompt engineering is simply learning to communicate more effectively.
+        </p>
+      </div>`,
+    notes: "Keep this brief — 2-3 minutes max. The goal is to jog their memory, not re-teach. The transition line at the bottom is the key message: this isn't about being technical, it's about being a better communicator."
+  },
+
+  // ---- SLIDE 4: Bad vs Good - The Problem ----
+  {
+    title: "The Problem with Vague Prompts",
+    section: "Bad vs Good Prompts",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Why Your Prompts Might Not Work Well</div>
+        <p>When you give an AI a vague prompt, you get a vague answer. It is like asking a helpful assistant to "do something useful" — they want to help, but they need direction.</p>
+        <div class="two-col">
+          <div class="card card-accent-danger">
+            <h3 style="color:var(--danger);">Vague Prompt</h3>
+            <p><em>"Write a letter."</em></p>
+            <p style="font-size:0.85rem;">The AI must guess: What kind? To whom? What tone? How long? About what?</p>
+          </div>
+          <div class="card card-accent-success">
+            <h3 style="color:var(--success);">Clear Prompt</h3>
+            <p><em>"Write a thank-you letter to my elderly neighbor who shoveled my driveway after a snowstorm. Keep it under 150 words and make it warm but sincere."</em></p>
+            <p style="font-size:0.85rem;">The AI knows exactly what to do.</p>
+          </div>
+        </div>
+        <p style="text-align:center; color:var(--accent); font-weight:600; margin-top:8px;">The AI is not mind-reading. It is pattern-matching. Better input = better output.</p>
+      </div>`,
+    notes: "This slide sets up the 'why' before we show the 'how.' Stress that the AI isn't being difficult — it genuinely doesn't know what they want unless they tell it. Use the assistant analogy."
+  },
+
+  // ---- SLIDE 5: Bad vs Good - Progressive ----
+  {
+    title: "Progressive Improvement",
+    section: "Bad vs Good Prompts",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Watch a Prompt Get Better, Step by Step</div>
+        <div class="progressive-steps">
+          <div class="prog-step step-1">
+            <span class="step-num">Version 1 — Too Vague</span>
+            <p>"Write a letter."</p>
+            <p class="step-note">The AI has to guess everything. You will get a generic, useless result.</p>
+          </div>
+          <div class="prog-step step-2 reveal-hidden" data-reveal>
+            <span class="step-num">Version 2 — Better</span>
+            <p>"Write a thank-you letter."</p>
+            <p class="step-note">Now the AI knows the type, but not who it is for, what it is about, or how long it should be.</p>
+          </div>
+          <div class="prog-step step-3 reveal-hidden" data-reveal>
+            <span class="step-num">Version 3 — Excellent</span>
+            <p>"Write a thank-you letter to my elderly neighbor who shoveled my driveway after a snowstorm. Keep it under 150 words and make it warm but sincere."</p>
+            <p class="step-note">Now the AI has: purpose, recipient, context, length constraint, and tone. The result will be specific and usable.</p>
+          </div>
+        </div>
+        <button class="reveal-btn" data-reveal-trigger>Show Next Version</button>
+      </div>`,
+    notes: "Click through each version one at a time. After each, ask the class: 'What changed? Why is this better?' This builds their intuition before we formalize the framework."
+  },
+
+  // ---- SLIDE 6: Anatomy Overview ----
+  {
+    title: "Anatomy of a Great Prompt",
+    section: "Anatomy of a Great Prompt",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">The Five Parts of an Effective Prompt</div>
+        <p>Great prompts are not mysterious. They have five building blocks. You do not need all five every time, but the more you include, the better your result.</p>
+        <div class="anatomy-grid">
+          <div class="anatomy-item">
+            <div class="anatomy-icon goal">G</div>
+            <div class="anatomy-text">
+              <h3>Goal</h3>
+              <p>What do you want the AI to do? Be specific about the task.</p>
+            </div>
+          </div>
+          <div class="anatomy-item">
+            <div class="anatomy-icon context">C</div>
+            <div class="anatomy-text">
+              <h3>Context</h3>
+              <p>Background information the AI needs to understand your situation.</p>
+            </div>
+          </div>
+          <div class="anatomy-item">
+            <div class="anatomy-icon audience">A</div>
+            <div class="anatomy-text">
+              <h3>Audience</h3>
+              <p>Who is the output for? A child, a professional, yourself?</p>
+            </div>
+          </div>
+          <div class="anatomy-item">
+            <div class="anatomy-icon constraints">C</div>
+            <div class="anatomy-text">
+              <h3>Constraints</h3>
+              <p>Length limits, things to avoid, format restrictions, deadlines.</p>
+            </div>
+          </div>
+          <div class="anatomy-item">
+            <div class="anatomy-icon format">F</div>
+            <div class="anatomy-text">
+              <h3>Format</h3>
+              <p>How should the answer look? Bullet points, table, letter, numbered list?</p>
+            </div>
+          </div>
+        </div>
+      </div>`,
+    notes: "This is the core framework of the entire class. Take your time here. Walk through each element. Tell them: 'Think of these as ingredients in a recipe. More ingredients = better dish.' We will revisit this framework at the end as a cheat sheet."
+  },
+
+  // ---- SLIDE 7: Anatomy Deep Dive 1 ----
+  {
+    title: "Goal and Context",
+    section: "Anatomy of a Great Prompt",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Deep Dive: Goal and Context</div>
+        <div class="two-col">
+          <div class="card card-accent">
+            <h3>Goal</h3>
+            <p>The <strong>single most important</strong> part of your prompt. Without a clear goal, nothing else matters.</p>
+            <ul>
+              <li><strong>Vague:</strong> "Help me with food"</li>
+              <li><strong>Clear:</strong> "Suggest three easy dinner recipes that take under 30 minutes"</li>
+            </ul>
+            <p style="font-size:0.85rem;">Start with a <strong>verb</strong>: Write, Explain, List, Compare, Summarize, Create, Suggest...</p>
+          </div>
+          <div class="card card-accent">
+            <h3>Context</h3>
+            <p>Context is the <strong>background</strong> the AI needs. Think: "What does the AI not know about me that matters?"</p>
+            <ul>
+              <li>Your experience level</li>
+              <li>Your situation or circumstances</li>
+              <li>What you have already tried</li>
+              <li>Relevant history or background</li>
+            </ul>
+            <p style="font-size:0.85rem;">Context transforms a generic answer into a <strong>personalized</strong> one.</p>
+          </div>
+        </div>
+      </div>`,
+    notes: "Emphasize that 'Goal' should always start with an action verb. For Context, use the analogy of talking to a new doctor — they need your medical history to give good advice. The AI needs your 'life history' relevant to the question."
+  },
+
+  // ---- SLIDE 8: Anatomy Deep Dive 2 ----
+  {
+    title: "Audience, Constraints, Format",
+    section: "Anatomy of a Great Prompt",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Deep Dive: Audience, Constraints, and Format</div>
+        <div class="card card-accent-warn" style="margin-bottom:14px;">
+          <h3>Audience</h3>
+          <p>Who will read or use the output? This changes <strong>everything</strong> — vocabulary, tone, depth, examples.</p>
+          <p><em>"Explain how a mortgage works" vs. "Explain how a mortgage works to a 12-year-old" vs. "Explain how a mortgage works to someone refinancing their home for the third time"</em></p>
+        </div>
+        <div class="card card-accent-danger" style="margin-bottom:14px;">
+          <h3>Constraints</h3>
+          <p>Tell the AI what <strong>not</strong> to do, or set boundaries. This is where you prevent unwanted results.</p>
+          <ul>
+            <li>"Keep it under 200 words"</li>
+            <li>"Do not use technical jargon"</li>
+            <li>"Only include free options"</li>
+            <li>"Focus on options available in Ohio"</li>
+          </ul>
+        </div>
+        <div class="card card-accent-success">
+          <h3>Format</h3>
+          <p>How should the answer be <strong>structured</strong>? The AI can adapt to almost any format you request.</p>
+          <ul>
+            <li>"Give me a table with columns for Name, Price, and Pros"</li>
+            <li>"Use bullet points"</li>
+            <li>"Write it as a formal email"</li>
+            <li>"Create a step-by-step checklist"</li>
+          </ul>
+        </div>
+      </div>`,
+    notes: "For Audience, do a live demo if possible — show the same question with three different audience specifications. For Constraints, emphasize that this is where most people fall short — they never tell the AI what to avoid. For Format, mention that this alone can dramatically improve usefulness."
+  },
+
+  // ---- SLIDES 9-18: Live Examples ----
+  {
+    title: "Example: Vacation Planning",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Vacation Planning</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"Help me plan a vacation."</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I am a 68-year-old retired teacher planning a 7-day trip to Portugal in October. I have mild arthritis and prefer not to walk more than 2 miles per day. I enjoy history, good food, and wine. My budget is around $3,000 including flights from Boston. Please create a day-by-day itinerary with accessible activities."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> Specifies age, physical limitation, interests, destination, timing, budget, departure city, and desired output format. The AI can now tailor every suggestion.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "Point out how each piece of information shapes the response. The arthritis detail alone changes restaurant and activity recommendations dramatically."
+  },
+
+  {
+    title: "Example: Writing an Email",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Writing an Email</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"Write an email to my landlord."</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"Write a polite but firm email to my landlord requesting that the broken dishwasher be repaired. I have already reported it twice — on March 5th and March 12th. I am a tenant of 3 years with a good payment history. Keep the tone professional, not angry. Keep it under 100 words."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> Specifies the issue, history of reports, tenant relationship context, desired tone (not angry, but firm), and a word limit. The AI knows exactly what balance to strike.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "The 'not angry, but firm' constraint is a great example of nuanced tone control. Without it, the AI might be too aggressive or too passive."
+  },
+
+  {
+    title: "Example: Learning a Hobby",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Learning a Hobby</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"Teach me watercolor painting."</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I am a complete beginner at watercolor painting, age 65, with some arthritis in my hands. Suggest 5 beginner-friendly techniques that do not require fine motor precision. For each technique, explain what supplies I need, give step-by-step instructions, and note what to watch out for. Format as a numbered list."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> The arthritis detail is crucial — it filters out techniques that would be frustrating. The format request (numbered list with specific sub-points for each) makes the output easy to follow.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "This example resonates well with the audience. The key insight: personal physical limitations are perfectly valid context to include in a prompt."
+  },
+
+  {
+    title: "Example: Cooking",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Cooking</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"Give me a chicken recipe."</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I need a simple baked chicken recipe for two people. I have basic kitchen tools, no fancy equipment. I cannot eat spicy food due to acid reflux. I have chicken breasts, olive oil, lemon, garlic, rosemary, and basic pantry staples. Give me clear steps with exact oven temperature and time. Include a simple side dish suggestion using potatoes."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> Lists available ingredients (so the AI does not suggest things you do not have), dietary restriction, serving size, equipment limitations, and requests precise cooking instructions.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "The ingredient list technique is very practical. Tell them: 'The AI does not know what is in your kitchen unless you tell it.'"
+  },
+
+  {
+    title: "Example: Budgeting",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Budgeting</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"Help me with my budget."</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I am 72, retired, living on Social Security ($2,200/month) and a small pension ($400/month). My fixed expenses are: mortgage $800, property tax $200, insurance $350, utilities $200, medications $150. Help me create a monthly budget that allows $100 for entertainment and still leaves room for savings. Present it as a simple table with categories and amounts."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> Real numbers let the AI do actual math. The table format makes it visual and easy to reference. The entertainment goal gives the AI a constraint to work around.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "Caution the class: AI can make math errors. Always double-check numbers. But for budget structure and categories, it is very helpful."
+  },
+
+  {
+    title: "Example: Health Information",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Health Information</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"What is type 2 diabetes?"</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"Explain type 2 diabetes in simple terms for someone who is 68 and recently diagnosed. My doctor said my A1C is 7.2. I do not have a medical background. Please explain: what is happening in my body, what numbers I should watch, and 3 practical diet changes I can make this week. Note that this is for general understanding, not medical advice."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> Includes specific personal data (age, A1C number), knowledge level, exactly what to cover (three specific questions), and responsibly notes this is not medical advice.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "Important: always remind students that AI is NOT a doctor. Including 'not medical advice' in the prompt is good practice. The A1C number makes the response much more relevant than a generic explanation."
+  },
+
+  {
+    title: "Example: Travel",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Travel</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"How do I get around Paris?"</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I am traveling to Paris for the first time, age 70, with my spouse who uses a cane. We are staying near the Louvre for 5 days. We want to visit 4-5 major sights. For each sight, tell us the best way to get there from our hotel using public transit, noting any stairs or long walks to avoid."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> The cane detail is critical — Paris Metro has many stairs. The AI can now flag accessible routes and alternatives like buses. Specific hotel location and sight list make the directions actionable.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "This is a great example of how a single detail (uses a cane) completely changes the quality of the answer. Without it, the AI would suggest Metro routes with lots of stairs."
+  },
+
+  {
+    title: "Example: Technology Help",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Technology Help</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"How do I use my iPhone?"</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I have an iPhone 15 that my daughter gave me. I have never used a smartphone before. Explain step by step how to: 1) Make a phone call, 2) Send a text message, 3) Take a photo, 4) Find a contact. Use simple language, avoid technical jargon, and tell me exactly what to tap on the screen for each step."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> Specifies exact model, experience level (never used a smartphone), four specific tasks, and requests tap-by-tap instructions without jargon. The AI will not skip steps a beginner needs.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "The 'never used a smartphone' context prevents the AI from assuming knowledge. 'Tell me exactly what to tap' is a great format constraint for tech help."
+  },
+
+  {
+    title: "Example: Genealogy",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Genealogy</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"How do I find my ancestors?"</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I want to research my family history. My grandparents emigrated from Ireland to New York around 1920. Their last name was O'Sullivan. I have no experience with genealogy. Give me a step-by-step plan starting with what I can do for free at home, then what I might do next. Recommend specific websites and tell me what information to gather first from my relatives."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> Provides specific origin, time period, destination, and family name. The 'start free at home' constraint prevents overwhelming suggestions. Requesting specific websites makes the plan actionable.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "Genealogy is popular with this age group. The 'free first' constraint is practical — many genealogy sites charge, and beginners should start with free resources."
+  },
+
+  {
+    title: "Example: Gardening",
+    section: "Live Examples",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Gardening</div>
+        <div class="prompt-compare">
+          <div class="prompt-card weak">
+            <span class="card-label">Weak</span>
+            <p>"How do I grow tomatoes?"</p>
+          </div>
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I want to grow tomatoes in my backyard garden in USDA Zone 6 (Ohio). I am 67 and can do moderate physical work but cannot kneel for long periods. I have a 10x10 foot garden space with full sun. Recommend 3 varieties good for beginners, tell me when to plant, how to set up supports I can reach without kneeling, and give me a watering schedule."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>Why it works:</strong> Zone, space, and physical limitations shape every recommendation. 'Cannot kneel' leads to raised bed or tall stake suggestions. '3 varieties' prevents information overload.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "Last example slide. Quick recap: every single improvement came from adding one or more of the five anatomy elements — Goal, Context, Audience, Constraints, Format."
+  },
+
+  // ---- SLIDE 19: Techniques Overview ----
+  {
+    title: "Prompting Techniques Overview",
+    section: "Techniques",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">A Toolkit of Techniques</div>
+        <p>We will now learn specific techniques that build on the five-part framework. Each one is a tool you can pull out when you need it.</p>
+        <div class="card-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-basic">Basic</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Role Prompting</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-basic">Basic</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Giving Context</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-basic">Basic</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Specifying Audience</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-basic">Basic</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Output Formatting</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-intermediate">Intermediate</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Using Constraints</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-intermediate">Intermediate</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Multiple Options</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-intermediate">Intermediate</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Brainstorming</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-intermediate">Intermediate</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Clarifying Questions</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-advanced">Advanced</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Step-by-Step Reasoning</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-advanced">Advanced</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Iterative Prompting</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-advanced">Advanced</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Using Examples</p>
+          </div>
+          <div class="card" style="text-align:center; padding:14px;">
+            <span class="tech-badge badge-advanced">Advanced</span>
+            <p style="font-size:0.88rem; margin:6px 0 0;">Chain Conversations</p>
+          </div>
+        </div>
+      </div>`,
+    notes: "This is a roadmap for the next several slides. Tell the class they do not need to memorize all of these — they just need to know they exist and come back to reference them. The badges show difficulty level."
+  },
+
+  // ---- SLIDE 20: Role & Persona ----
+  {
+    title: "Role and Persona Prompting",
+    section: "Techniques",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Role and Persona Prompting</div>
+        <p>Tell the AI <strong>who to be</strong>. This changes vocabulary, depth, perspective, and tone dramatically.</p>
+        <div class="expandable">
+          <button class="expand-trigger" data-expand-trigger>
+            <span>Role Prompting — Assign an Expert Role</span>
+            <span class="arrow">&#9662;</span>
+          </button>
+          <div class="expand-body">
+            <p><em>"You are an experienced travel agent who specializes in accessible travel for seniors. Suggest..."</em></p>
+            <p><em>"You are a retired financial advisor explaining investing to a fellow retiree..."</em></p>
+            <p>The AI adopts the knowledge, tone, and perspective of that role.</p>
+          </div>
+        </div>
+        <div class="expandable">
+          <button class="expand-trigger" data-expand-trigger>
+            <span>Persona Prompting — Define a Character</span>
+            <span class="arrow">&#9662;</span>
+          </button>
+          <div class="expand-body">
+            <p><em>"Act as a patient, encouraging Spanish tutor who uses simple words and celebrates small progress..."</em></p>
+            <p><em>"You are a warm, grandmotherly cook who explains recipes like you are talking to a grandchild..."</em></p>
+            <p>Personas add emotional tone and teaching style, not just expertise.</p>
+          </div>
+        </div>
+        <div class="card card-accent-warn" style="margin-top:10px;">
+          <p style="margin:0;"><strong>Tip:</strong> Combine role with the five-part framework for maximum effect: Role + Goal + Context + Audience + Constraints + Format.</p>
+        </div>
+      </div>`,
+    notes: "Role prompting is often the single biggest improvement people can make. Demonstrate live if possible: ask the same question with and without a role assignment. The difference is striking."
+  },
+
+  // ---- SLIDE 21: Context & Audience ----
+  {
+    title: "Context and Audience Techniques",
+    section: "Techniques",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Context and Audience Techniques</div>
+        <div class="two-col">
+          <div class="card card-accent">
+            <h3>Giving Context</h3>
+            <p>Think of context as <strong>setting the scene</strong>. The more relevant background you provide, the more tailored the response.</p>
+            <ul>
+              <li>"I have been gardening for 20 years but never grown roses..."</li>
+              <li>"I just moved to a small town from a big city..."</li>
+              <li>"I already tried resetting my router and restarting my computer..."</li>
+            </ul>
+            <p style="font-size:0.85rem;">Context prevents the AI from suggesting things you have already done or do not apply.</p>
+          </div>
+          <div class="card card-accent">
+            <h3>Specifying Audience</h3>
+            <p>Always answer: <strong>"Who is this for?"</strong></p>
+            <ul>
+              <li><em>"Explain this to a 10-year-old"</em> — simple language, analogies</li>
+              <li><em>"Write this for a healthcare professional"</em> — technical, precise</li>
+              <li><em>"Make this appropriate for a church newsletter"</em> — respectful tone</li>
+              <li><em>"Write this for my peers in my book club"</em> — conversational, literary</li>
+            </ul>
+            <p style="font-size:0.85rem;">The same information, presented to different audiences, should look completely different.</p>
+          </div>
+        </div>
+      </div>`,
+    notes: "For audience, a good exercise: ask the class to imagine explaining 'how email works' to a child vs. a teenager vs. a peer. Same topic, wildly different explanations. The AI does the same thing when you specify audience."
+  },
+
+  // ---- SLIDE 22: Formatting & Constraints ----
+  {
+    title: "Formatting and Constraints",
+    section: "Techniques",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Formatting and Constraints</div>
+        <div class="expandable">
+          <button class="expand-trigger" data-expand-trigger>
+            <span>Output Formatting — Shape the Answer</span>
+            <span class="arrow">&#9662;</span>
+          </button>
+          <div class="expand-body">
+            <ul>
+              <li><code>"Format as a table with columns for..."</code></li>
+              <li><code>"Use bullet points, no paragraphs"</code></li>
+              <li><code>"Write it as a formal business letter"</code></li>
+              <li><code>"Create a checklist I can print"</code></li>
+              <li><code>"Give me a pros and cons list"</code></li>
+              <li><code>"Write it as a dialogue between two people"</code></li>
+            </ul>
+            <p>The AI is remarkably flexible. If you can describe the format, it can probably produce it.</p>
+          </div>
+        </div>
+        <div class="expandable">
+          <button class="expand-trigger" data-expand-trigger>
+            <span>Using Constraints — Set Boundaries</span>
+            <span class="arrow">&#9662;</span>
+          </button>
+          <div class="expand-body">
+            <ul>
+              <li><code>"Keep it under 150 words"</code> — length</li>
+              <li><code>"Only suggest free resources"</code> — cost</li>
+              <li><code>"Do not use medical jargon"</code> — language</li>
+              <li><code>"Focus on options in the Midwest"</code> — geography</li>
+              <li><code>"Assume no prior knowledge"</code> — knowledge level</li>
+              <li><code>"Do not include more than 5 options"</code> — quantity</li>
+            </ul>
+            <p>Constraints are not limitations — they are <strong>guidance</strong> that helps the AI focus.</p>
+          </div>
+        </div>
+      </div>`,
+    notes: "Formatting is underused. Show that 'give me a table' vs. no format request produces dramatically different usefulness. Constraints are the secret weapon — most people never use them."
+  },
+
+  // ---- SLIDE 23: Multiple Options & Brainstorming ----
+  {
+    title: "Multiple Options and Brainstorming",
+    section: "Techniques",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Multiple Options and Brainstorming</div>
+        <div class="two-col">
+          <div class="card card-accent">
+            <h3>Asking for Multiple Options</h3>
+            <p>Instead of one answer, ask for <strong>several choices</strong>. This gives you the power to pick what fits best.</p>
+            <ul>
+              <li>"Give me <strong>5 different</strong> dinner ideas"</li>
+              <li>"Suggest <strong>3 approaches</strong> to learning Spanish"</li>
+              <li>"List <strong>4 possible</strong> gift ideas for a 70th birthday, each under $50"</li>
+            </ul>
+            <p style="font-size:0.85rem;">You can even ask the AI to <em>compare</em> the options for you.</p>
+          </div>
+          <div class="card card-accent">
+            <h3>Brainstorming Mode</h3>
+            <p>Use the AI as a <strong>thinking partner</strong>. Explicitly ask it to generate ideas without judging them.</p>
+            <ul>
+              <li>"Brainstorm 10 ways to stay socially active after retiring"</li>
+              <li>"Give me creative gift ideas for someone who has everything — no idea is too unusual"</li>
+              <li>"Help me think of ways to repurpose my spare bedroom"</li>
+            </ul>
+            <p style="font-size:0.85rem;">Add <code>"Do not evaluate the ideas, just list them"</code> to get pure brainstorming.</p>
+          </div>
+        </div>
+      </div>`,
+    notes: "Multiple options is great for decision fatigue — let the AI generate choices, then you pick. Brainstorming mode is liberating because you do not have to be the sole source of ideas."
+  },
+
+  // ---- SLIDE 24: Clarifying Questions & Step-by-Step ----
+  {
+    title: "Clarifying Questions and Step-by-Step",
+    section: "Techniques",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Clarifying Questions and Step-by-Step Reasoning</div>
+        <div class="expandable">
+          <button class="expand-trigger" data-expand-trigger>
+            <span>Ask AI to Ask YOU Questions First</span>
+            <span class="arrow">&#9662;</span>
+          </button>
+          <div class="expand-body">
+            <p>This is a powerful technique when you are not sure what information the AI needs:</p>
+            <p><code>"Before you answer, ask me 3-5 clarifying questions so you can give me the best possible response."</code></p>
+            <p>The AI will ask about your budget, experience level, preferences, constraints — things you might not have thought to include. Then it gives a much better answer.</p>
+            <p style="font-size:0.85rem; color:var(--accent);"><strong>Use this when:</strong> You know what you want broadly but cannot figure out how to structure the prompt.</p>
+          </div>
+        </div>
+        <div class="expandable">
+          <button class="expand-trigger" data-expand-trigger>
+            <span>Step-by-Step Reasoning</span>
+            <span class="arrow">&#9662;</span>
+          </button>
+          <div class="expand-body">
+            <p>For complex tasks, ask the AI to think through it systematically:</p>
+            <p><code>"Think through this step by step before giving me your answer."</code></p>
+            <p><code>"Walk me through your reasoning process."</code></p>
+            <p>This technique reduces errors and makes the AI's logic transparent so you can spot mistakes.</p>
+            <p style="font-size:0.85rem; color:var(--accent);"><strong>Use this when:</strong> The task involves math, logic, comparisons, or multi-step processes.</p>
+          </div>
+        </div>
+      </div>`,
+    notes: "The 'ask me questions first' technique is often a lightbulb moment for students. It flips the dynamic — instead of you struggling to write the perfect prompt, the AI helps you build it. Highly recommend a live demo."
+  },
+
+  // ---- SLIDE 25: Iterative & Refining ----
+  {
+    title: "Iterative Prompting and Refining",
+    section: "Techniques",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Iterative Prompting and Refining Responses</div>
+        <p>You rarely get the perfect answer on the first try — and that is <strong>completely normal</strong>. The real skill is knowing how to refine.</p>
+        <div class="card card-accent" style="margin-bottom:12px;">
+          <h3>Iterative Prompting — Build in Layers</h3>
+          <p>Start simple, then add detail based on what you get back:</p>
+          <ul>
+            <li><strong>Round 1:</strong> "Suggest some weekend activities for seniors"</li>
+            <li><strong>Round 2:</strong> "Great, focus on outdoor activities only"</li>
+            <li><strong>Round 3:</strong> "Now give me just the top 3 that cost under $20"</li>
+            <li><strong>Round 4:</strong> "For the first one, give me a detailed plan with times"</li>
+          </ul>
+        </div>
+        <div class="card card-accent">
+          <h3>Refining Responses — Fix What Is Wrong</h3>
+          <p>Direct the AI to adjust its previous answer:</p>
+          <ul>
+            <li>"Make it shorter — cut it in half"</li>
+            <li>"Make the tone more formal"</li>
+            <li>"You used too much jargon — simplify the language"</li>
+            <li>"The third point is not relevant — replace it with something about budget"</li>
+            <li>"Rewrite the conclusion to be more encouraging"</li>
+          </ul>
+        </div>
+      </div>`,
+    notes: "This is the most important practical skill. Emphasize: prompt engineering is not about writing one perfect prompt — it is a conversation. Even experts iterate 3-5 times."
+  },
+
+  // ---- SLIDE 26: Examples & Chain Conversations ----
+  {
+    title: "Using Examples and Chain Conversations",
+    section: "Techniques",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Using Examples and Chain Conversations</div>
+        <div class="two-col">
+          <div class="card card-accent">
+            <h3>Using Examples in Prompts</h3>
+            <p>Show the AI what you want by <strong>providing an example</strong>. This is one of the most effective techniques.</p>
+            <p><em>"Write product reviews in this style:</em></p>
+            <p><em>'Bought this for my arthritis. Easy to grip, comfortable, worth every penny. 5 stars.'</em></p>
+            <p><em>Now write a review for a knee brace in the same style."</em></p>
+            <p style="font-size:0.85rem;">The AI will match the tone, length, structure, and voice of your example.</p>
+          </div>
+          <div class="card card-accent">
+            <h3>Chain Conversations</h3>
+            <p>The AI <strong>remembers</strong> what was said earlier in the conversation. Use this to build on previous answers.</p>
+            <ul>
+              <li>"Now take the second option from your last answer and expand on it"</li>
+              <li>"Remember the budget you created? Adjust it assuming my medication costs go up by $50"</li>
+              <li>"Using the recipe you just gave me, what sides would pair well?"</li>
+            </ul>
+            <p style="font-size:0.85rem;">You do not need to repeat context — the conversation history does that for you.</p>
+          </div>
+        </div>
+      </div>`,
+    notes: "Examples are incredibly powerful because they bypass description — you show instead of tell. Chain conversations mean you do not have to write mega-prompts. Start simple and build up naturally."
+  },
+
+  // ---- SLIDE 27: Live Exercise Intro ----
+  {
+    title: "Live Exercise",
+    section: "Exercises",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Practice Time</div>
+        <p style="font-size:1.1rem; margin-bottom:20px;">Now it is your turn. For each of the next five prompts, think about how you would improve it using what we have learned.</p>
+        <div class="card card-accent-warn">
+          <h3>How This Works</h3>
+          <ol>
+            <li>Read the <span class="hl-bad">weak prompt</span></li>
+            <li>Think about which of the five parts are missing (Goal, Context, Audience, Constraints, Format)</li>
+            <li>Decide what techniques you would apply</li>
+            <li>Click the button to see an <span class="hl-ok">improved version</span></li>
+            <li>Compare — did you think of things the improved version missed?</li>
+          </ol>
+        </div>
+        <p style="text-align:center; color:var(--primary); font-weight:700; margin-top:16px;">There is no single right answer. The goal is to practice thinking systematically.</p>
+      </div>`,
+    notes: "Encourage participation. Ask if anyone wants to share their improved version before you reveal the answer. This is the most valuable part of the class — active practice."
+  },
+
+  // ---- SLIDES 28-32: Five Exercises ----
+  {
+    title: "Exercise 1: Birthday Card",
+    section: "Exercises",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Exercise 1: Birthday Card</div>
+        <div class="exercise-prompt">
+          <div class="exercise-label">Weak Prompt</div>
+          <p>"Write a birthday card for my friend."</p>
+        </div>
+        <div class="prompt-compare">
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"Write a birthday card message for my best friend of 40 years, Margaret, who is turning 70. We met in college and shared many adventures. Keep it heartfelt but not mushy, under 75 words, and include a reference to our college days."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>What changed:</strong> Added context (40-year friendship, college), audience (best friend), constraints (under 75 words, not mushy), and a specific detail request (college reference).</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "Let students discuss for 1-2 minutes before revealing. Ask: 'What would you add that this improved version does not include?'"
+  },
+
+  {
+    title: "Exercise 2: Leaky Faucet",
+    section: "Exercises",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Exercise 2: Fixing a Leaky Faucet</div>
+        <div class="exercise-prompt">
+          <div class="exercise-label">Weak Prompt</div>
+          <p>"How do I fix a leaky faucet?"</p>
+        </div>
+        <div class="prompt-compare">
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"My kitchen faucet drips from the spout when turned off. It is a single-handle Delta faucet, about 8 years old. I have basic tools (wrench, screwdriver, pliers) but no plumbing experience. Give me step-by-step instructions and tell me what replacement part I might need to buy at a hardware store."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>What changed:</strong> Specific problem (drips from spout), exact fixture type, age, available tools, experience level, and format (step-by-step + parts list). A plumber would ask these same questions.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "The 'what replacement part' request is a smart addition most people would not think of. It turns a generic answer into a shopping list."
+  },
+
+  {
+    title: "Exercise 3: Blood Test Results",
+    section: "Exercises",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Exercise 3: Understanding Blood Test Results</div>
+        <div class="exercise-prompt">
+          <div class="exercise-label">Weak Prompt</div>
+          <p>"What does my blood test mean?"</p>
+        </div>
+        <div class="prompt-compare">
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"My recent blood test shows: LDL cholesterol 165 mg/dL, HDL 42 mg/dL, total cholesterol 225 mg/dL, fasting glucose 98 mg/dL. I am a 71-year-old man. Explain what each number means in plain language, which values are outside normal range, and suggest 3 lifestyle changes that might help. Note: this is for my own understanding, not medical advice."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>What changed:</strong> Real numbers, age, gender, audience (non-medical person), format (explain each + highlight concerns + 3 suggestions), and the important disclaimer about not being medical advice.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "Always reinforce: AI does not replace doctors. Including the disclaimer in the prompt is good practice. The 'plain language' constraint prevents medical jargon."
+  },
+
+  {
+    title: "Exercise 4: Organizing Photos",
+    section: "Exercises",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Exercise 4: Organizing Digital Photos</div>
+        <div class="exercise-prompt">
+          <div class="exercise-label">Weak Prompt</div>
+          <p>"Help me organize my photos."</p>
+        </div>
+        <div class="prompt-compare">
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"I have about 2,000 digital photos scattered across my phone, an old laptop, and two USB drives, spanning 2005 to 2024. I want to organize them by year and event, delete duplicates, and back them up safely. I am not very tech-savvy. Give me a simple, step-by-step plan using free software, starting with the easiest first step."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>What changed:</strong> Scale of the problem, specific sources, date range, goals (organize, deduplicate, backup), skill level (not tech-savvy), constraint (free software only), and format (step-by-step starting easy).</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "'Not very tech-savvy' and 'free software only' are crucial constraints. Without them, the AI might suggest Adobe Lightroom or command-line tools."
+  },
+
+  {
+    title: "Exercise 5: Letter to Grandson",
+    section: "Exercises",
+    content: `
+      <div class="stagger">
+        <div class="slide-topic">Exercise 5: Letter to Grandson</div>
+        <div class="exercise-prompt">
+          <div class="exercise-label">Weak Prompt</div>
+          <p>"Write a letter to my grandson."</p>
+        </div>
+        <div class="prompt-compare">
+          <div class="prompt-card improved reveal-hidden" data-reveal>
+            <span class="card-label">Improved</span>
+            <p>"Write a letter to my 15-year-old grandson, Ethan, who just got his first part-time job at a grocery store. I want to encourage him, share a brief story about my first job at 16, and give him one piece of advice about money. Keep the tone warm and conversational, like a grandpa talking — not a lecture. About 200 words."</p>
+          </div>
+          <div class="why-box reveal-hidden" data-reveal>
+            <p><strong>What changed:</strong> Name, age, specific occasion (first job), three clear content goals (encourage, share story, one money tip), tone constraint (warm, not a lecture), and word count. The 'not a lecture' constraint keeps it from sounding preachy to a teenager.</p>
+          </div>
+          <button class="reveal-btn" data-reveal-trigger>Show Improved Version</button>
+        </div>
+      </div>`,
+    notes: "Last exercise. The 'not a lecture' constraint is a subtle but powerful audience-awareness move. Teens can smell a lecture from a mile away — the AI needs that guidance."
+  },
+
+  // ---- SLIDE 33: Common Mistakes ----
+  {
+    title: "Common Mistakes",
+    section: "Mistakes to Avoid",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Common Mistakes to Avoid</div>
+        <div class="mistake-item">
+          <span class="mistake-x">&#10007;</span>
+          <p><strong>Being too vague.</strong> "Help me with cooking" tells the AI nothing. What dish? What ingredients? What skill level?</p>
+        </div>
+        <div class="mistake-item">
+          <span class="mistake-x">&#10007;</span>
+          <p><strong>Asking multiple unrelated questions.</strong> "What is diabetes and also how do I fix my sink?" — split these into separate conversations.</p>
+        </div>
+        <div class="mistake-item">
+          <span class="mistake-x">&#10007;</span>
+          <p><strong>Not giving context.</strong> The AI does not know your age, health, budget, location, or experience unless you tell it.</p>
+        </div>
+        <div class="mistake-item">
+          <span class="mistake-x">&#10007;</span>
+          <p><strong>Expecting perfect answers.</strong> AI makes mistakes. Always verify important information, especially about health, finances, and legal matters.</p>
+        </div>
+        <div class="mistake-item">
+          <span class="mistake-x">&#10007;</span>
+          <p><strong>Stopping after the first response.</strong> The first answer is a starting point, not the final product. Iterate and refine.</p>
+        </div>
+        <div class="mistake-item">
+          <span class="mistake-x">&#10007;</span>
+          <p><strong>Treating AI like Google.</strong> Google finds existing pages. AI generates new text. Use AI for creation, explanation, and brainstorming — not just lookups.</p>
+        </div>
+      </div>`,
+    notes: "Go through each one and ask if anyone has made these mistakes (they all have — be reassuring). The 'treating AI like Google' point is the most common conceptual mistake."
+  },
+
+  // ---- SLIDE 34: Advanced Tips ----
+  {
+    title: "Advanced Tips",
+    section: "Advanced Tips",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Advanced Tips for Regular Use</div>
+        <div class="card-grid">
+          <div class="card card-accent">
+            <h3>Prompt Templates</h3>
+            <p>Save prompts you like and reuse them with changed details. Create a "recipe prompt" template, a "travel planning" template, etc.</p>
+          </div>
+          <div class="card card-accent">
+            <h3>Reusable Formulas</h3>
+            <p>Develop go-to formulas like: <code>"As a [role], [task] for [audience]. Context: [details]. Format: [structure]."</code></p>
+          </div>
+          <div class="card card-accent">
+            <h3>AI as Brainstorm Partner</h3>
+            <p>Stuck on a gift idea? A project? A decision? Ask the AI to generate 10 options with no judgment, then pick your favorite.</p>
+          </div>
+          <div class="card card-accent">
+            <h3>AI as Editor</h3>
+            <p>Write something yourself first, then ask: "Review this for clarity, grammar, and tone. Suggest improvements."</p>
+          </div>
+          <div class="card card-accent">
+            <h3>AI as Tutor</h3>
+            <p>"Teach me about [topic] as if I am a beginner. Check my understanding with a quiz at the end."</p>
+          </div>
+          <div class="card card-accent">
+            <h3>AI as Travel Planner</h3>
+            <p>Use role prompting: "You are a travel agent. Plan my 5-day trip to..." Include all five anatomy parts for best results.</p>
+          </div>
+          <div class="card card-accent" style="grid-column: 1 / -1;">
+            <h3>AI as Research Assistant</h3>
+            <p>"Summarize the key arguments for and against [topic]. Cite the general consensus and note any areas of debate. Present as a balanced overview." — Always verify claims with reliable sources.</p>
+          </div>
+        </div>
+      </div>`,
+    notes: "The template and formula tips are the most practical takeaways. Encourage students to write down one formula they will use this week. The 'AI as editor' tip is great because it keeps them in the driver's seat — they write first, AI refines."
+  },
+
+  // ---- SLIDE 35: Cheat Sheet ----
+  {
+    title: "Prompt Cheat Sheet",
+    section: "Cheat Sheet",
+    content: `
+      <div class="stagger">
+        <div class="slide-title">Your Prompt Engineering Cheat Sheet</div>
+        <p>Remember <strong>G-C-A-C-F-F</strong> — six letters that turn any vague request into a powerful prompt.</p>
+        <div class="cheat-grid">
+          <div class="cheat-item">
+            <div class="cheat-letter l-g">G</div>
+            <div class="cheat-word">Goal</div>
+            <div class="cheat-desc">What do you want done? Start with a verb.</div>
+          </div>
+          <div class="cheat-item">
+            <div class="cheat-letter l-c">C</div>
+            <div class="cheat-word">Context</div>
+            <div class="cheat-desc">What background does the AI need?</div>
+          </div>
+          <div class="cheat-item">
+            <div class="cheat-letter l-a">A</div>
+            <div class="cheat-word">Audience</div>
+            <div class="cheat-desc">Who is this for? Age, knowledge, role?</div>
+          </div>
+          <div class="cheat-item">
+            <div class="cheat-letter l-c2">C</div>
+            <div class="cheat-word">Constraints</div>
+            <div class="cheat-desc">Length, budget, things to avoid, limits.</div>
+          </div>
+          <div class="cheat-item">
+            <div class="cheat-letter l-f">F</div>
+            <div class="cheat-word">Format</div>
+            <div class="cheat-desc">Table, list, letter, checklist, steps?</div>
+          </div>
+          <div class="cheat-item">
+            <div class="cheat-letter l-f2">F</div>
+            <div class="cheat-word">Follow-up</div>
+            <div class="cheat-desc">Refine, iterate, ask for changes.</div>
+          </div>
+        </div>
+        <div class="card card-accent-warn" style="margin-top:8px;">
+          <p style="margin:0; text-align:center;"><strong>Quick formula:</strong> <code>"As a [role], [goal] for [audience]. Context: [details]. Constraints: [limits]. Format: [structure]."</code></p>
+        </div>
+      </div>`,
+    notes: "This is the slide they should photograph or write down. Walk through each letter one more time. The formula at the bottom is a fill-in-the-blank they can use immediately. Suggest they try it with their very next AI question."
+  },
+
+  // ---- SLIDE 36: Closing ----
+  {
+    title: "Closing",
+    section: "Closing",
+    content: `
+      <div class="closing-slide stagger">
+        <div class="slide-title" style="text-align:center;">Three Things to Remember</div>
+        <div class="takeaway-item">
+          <div class="takeaway-num">1</div>
+          <div class="takeaway-text"><strong>Structure your prompts.</strong> Use the G-C-A-C-F-F framework. Even adding two or three elements makes a huge difference.</div>
+        </div>
+        <div class="takeaway-item">
+          <div class="takeaway-num">2</div>
+          <div class="takeaway-text"><strong>Iterate, do not expect perfection.</strong> Your first prompt is a starting point. Refine, adjust, and build on the AI's response.</div>
+        </div>
+        <div class="takeaway-item">
+          <div class="takeaway-num">3</div>
+          <div class="takeaway-text"><strong>Experiment fearlessly.</strong> The AI will not judge you. Try different techniques, roles, and formats. The more you practice, the better you get.</div>
+        </div>
+        <div class="closing-quote">
+          <p>"The quality of the answer usually depends on the quality of the prompt."</p>
+        </div>
+      </div>`,
+    notes: "End on a high note. Thank the class for their participation. Remind them that prompt engineering is a skill that improves with practice — just like learning to cook or garden. Encourage them to try at least one structured prompt this week. Open the floor for final questions."
+  }
+];
+
+/* ============================================================
+   STATE & DOM REFERENCES
+   ============================================================ */
+let currentSlide = 0;
+let isTransitioning = false;
+let notesOpen = false;
+let tocOpen = false;
+
+const slideContent = document.getElementById('slide-content');
+const progressFill = document.getElementById('progress-fill');
+const slideCounter = document.getElementById('slide-counter');
+const btnPrev = document.getElementById('btn-prev');
+const btnNext = document.getElementById('btn-next');
+const btnToc = document.getElementById('btn-toc');
+const btnNotes = document.getElementById('btn-notes');
+const btnFullscreen = document.getElementById('btn-fullscreen');
+const tocSidebar = document.getElementById('toc-sidebar');
+const tocOverlay = document.getElementById('toc-overlay');
+const tocClose = document.getElementById('toc-close');
+const tocList = document.getElementById('toc-list');
+const speakerNotes = document.getElementById('speaker-notes');
+const notesContent = document.getElementById('notes-content');
+
+/* ============================================================
+   BUILD TABLE OF CONTENTS
+   ============================================================ */
+function buildTOC() {
+  let currentSection = '';
+  slides.forEach((slide, i) => {
+    // Add section header when section changes
+    if (slide.section && slide.section !== currentSection) {
+      currentSection = slide.section;
+      const li = document.createElement('li');
+      li.className = 'toc-section';
+      li.textContent = currentSection;
+      tocList.appendChild(li);
+    }
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.textContent = slide.title;
+    btn.setAttribute('aria-label', 'Go to slide: ' + slide.title);
+    btn.addEventListener('click', () => {
+      goToSlide(i);
+      closeTOC();
+    });
+    li.appendChild(btn);
+    tocList.appendChild(li);
+  });
+}
+
+/* ============================================================
+   RENDER SLIDE
+   ============================================================ */
+function renderSlide() {
+  const slide = slides[currentSlide];
+  slideContent.innerHTML = slide.content;
+  notesContent.innerHTML = slide.notes;
+
+  // Update progress
+  const pct = ((currentSlide + 1) / slides.length) * 100;
+  progressFill.style.width = pct + '%';
+
+  // Update counter
+  slideCounter.textContent = (currentSlide + 1) + ' / ' + slides.length;
+
+  // Update nav buttons
+  btnPrev.disabled = currentSlide === 0;
+  btnNext.disabled = currentSlide === slides.length - 1;
+
+  // Update TOC active state
+  const tocButtons = tocList.querySelectorAll('button');
+  let btnIndex = 0;
+  tocButtons.forEach((btn) => {
+    // Map button index to slide index (skip section headers)
+    btn.classList.remove('active');
+  });
+  // Find the correct TOC button by matching slide index
+  let tocBtnIdx = 0;
+  for (let i = 0; i <= currentSlide; i++) {
+    if (slides[i].section && (i === 0 || slides[i].section !== slides[i-1].section)) {
+      // This is a section header, skip it in button count
+    }
+    tocBtnIdx = i;
+  }
+  // Simpler approach: count only non-section items
+  let slideOnlyIdx = 0;
+  for (let i = 0; i < slides.length; i++) {
+    if (i === currentSlide) {
+      const allBtns = tocList.querySelectorAll('button');
+      if (allBtns[slideOnlyIdx]) allBtns[slideOnlyIdx].classList.add('active');
+      break;
+    }
+    slideOnlyIdx++;
+  }
+
+  // Scroll slide content to top
+  slideContent.scrollTop = 0;
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function navigateTo(index, direction) {
+  if (isTransitioning || index === currentSlide) return;
+  if (index < 0 || index >= slides.length) return;
+
+  isTransitioning = true;
+
+  const exitClass = direction === 'next' ? 'exit-left' : 'exit-right';
+  const enterClass = direction === 'next' ? 'enter-right' : 'enter-left';
+
+  // Exit current slide
+  slideContent.classList.add(exitClass);
+
+  setTimeout(() => {
+    currentSlide = index;
+    slideContent.classList.remove(exitClass);
+    slideContent.classList.add(enterClass);
+    renderSlide();
+
+    // Force reflow before removing enter class
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        slideContent.classList.remove(enterClass);
+        isTransitioning = false;
+      });
+    });
+  }, 320);
+}
+
+function nextSlide() {
+  if (currentSlide < slides.length - 1) {
+    navigateTo(currentSlide + 1, 'next');
+  }
+}
+
+function prevSlide() {
+  if (currentSlide > 0) {
+    navigateTo(currentSlide - 1, 'prev');
+  }
+}
+
+function goToSlide(index) {
+  const direction = index > currentSlide ? 'next' : 'prev';
+  navigateTo(index, direction);
+}
+
+/* ============================================================
+   TOC
+   ============================================================ */
+function openTOC() {
+  tocOpen = true;
+  tocSidebar.classList.add('active');
+  tocOverlay.classList.add('active');
+  tocOverlay.setAttribute('aria-hidden', 'false');
+  btnToc.classList.add('active');
+  // Focus first button
+  const firstBtn = tocList.querySelector('button');
+  if (firstBtn) firstBtn.focus();
+}
+
+function closeTOC() {
+  tocOpen = false;
+  tocSidebar.classList.remove('active');
+  tocOverlay.classList.remove('active');
+  tocOverlay.setAttribute('aria-hidden', 'true');
+  btnToc.classList.remove('active');
+}
+
+function toggleTOC() {
+  tocOpen ? closeTOC() : openTOC();
+}
+
+/* ============================================================
+   SPEAKER NOTES
+   ============================================================ */
+function toggleNotes() {
+  notesOpen = !notesOpen;
+  speakerNotes.classList.toggle('open', notesOpen);
+  btnNotes.classList.toggle('active', notesOpen);
+}
+
+/* ============================================================
+   FULLSCREEN
+   ============================================================ */
+function toggleFullscreen() {
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen();
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    }
+    btnFullscreen.classList.add('active');
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+    btnFullscreen.classList.remove('active');
+  }
+}
+
+// Update fullscreen button state when fullscreen changes
+document.addEventListener('fullscreenchange', () => {
+  btnFullscreen.classList.toggle('active', !!document.fullscreenElement);
+});
+document.addEventListener('webkitfullscreenchange', () => {
+  btnFullscreen.classList.toggle('active', !!document.webkitFullscreenElement);
+});
+
+/* ============================================================
+   INTERACTIVE ELEMENTS (Event Delegation)
+   ============================================================ */
+document.getElementById('slide-area').addEventListener('click', (e) => {
+  // Reveal trigger
+  const revealTrigger = e.target.closest('[data-reveal-trigger]');
+  if (revealTrigger) {
+    const container = revealTrigger.closest('.prompt-compare') ||
+                      revealTrigger.closest('.progressive-steps') ||
+                      revealTrigger.parentElement;
+    const hidden = container.querySelector('.reveal-hidden:not(.revealed)');
+    if (hidden) {
+      hidden.classList.add('revealed');
+      if (!container.querySelector('.reveal-hidden:not(.revealed)')) {
+        revealTrigger.style.display = 'none';
+      }
+    }
+    return;
+  }
+
+  // Expand trigger
+  const expandTrigger = e.target.closest('[data-expand-trigger]');
+  if (expandTrigger) {
+    const body = expandTrigger.nextElementSibling;
+    const isOpen = body.classList.contains('open');
+    expandTrigger.classList.toggle('active', !isOpen);
+    body.classList.toggle('open', !isOpen);
+    expandTrigger.setAttribute('aria-expanded', !isOpen);
+    return;
+  }
+});
+
+/* ============================================================
+   KEYBOARD NAVIGATION
+   ============================================================ */
+document.addEventListener('keydown', (e) => {
+  // Skip if typing in an input
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  switch(e.key) {
+    case 'ArrowRight':
+    case 'ArrowDown':
+    case ' ':
+      e.preventDefault();
+      nextSlide();
+      break;
+    case 'ArrowLeft':
+    case 'ArrowUp':
+      e.preventDefault();
+      prevSlide();
+      break;
+    case 'Home':
+      e.preventDefault();
+      goToSlide(0);
+      break;
+    case 'End':
+      e.preventDefault();
+      goToSlide(slides.length - 1);
+      break;
+    case 'Escape':
+      if (tocOpen) closeTOC();
+      break;
+    case 't':
+    case 'T':
+      if (!e.ctrlKey && !e.metaKey) toggleTOC();
+      break;
+    case 'n':
+    case 'N':
+      if (!e.ctrlKey && !e.metaKey) toggleNotes();
+      break;
+    case 'f':
+    case 'F':
+      if (!e.ctrlKey && !e.metaKey) toggleFullscreen();
+      break;
+  }
+});
+
+/* ============================================================
+   BUTTON EVENT LISTENERS
+   ============================================================ */
+btnPrev.addEventListener('click', prevSlide);
+btnNext.addEventListener('click', nextSlide);
+btnToc.addEventListener('click', toggleTOC);
+btnNotes.addEventListener('click', toggleNotes);
+btnFullscreen.addEventListener('click', toggleFullscreen);
+tocClose.addEventListener('click', closeTOC);
+tocOverlay.addEventListener('click', closeTOC);
+
+/* ============================================================
+   TOUCH SWIPE SUPPORT
+   ============================================================ */
+let touchStartX = 0;
+let touchStartY = 0;
+
+document.addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+  touchStartY = e.changedTouches[0].screenY;
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+  const dx = e.changedTouches[0].screenX - touchStartX;
+  const dy = e.changedTouches[0].screenY - touchStartY;
+  // Only trigger if horizontal swipe is dominant and exceeds threshold
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
+    if (dx < 0) nextSlide();
+    else prevSlide();
+  }
+}, { passive: true });
+
+/* ============================================================
+   INIT
+   ============================================================ */
+buildTOC();
+renderSlide();
+</script>
+</body>
+</html>
