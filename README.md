@@ -66,20 +66,6 @@ You can customize:
 - Navigation
 - Layout
 
-## How It Was Created
-
-This presentation was generated with AI from a detailed prompt that specified:
-
-- Educational objectives
-- Audience
-- Lesson structure
-- Interactive elements
-- Accessibility requirements
-- Visual design
-- Technical constraints
-
-The AI was instructed to produce a fully self contained presentation using only HTML, CSS, and vanilla JavaScript.
-
 ## License
 
 Feel free to use, modify, and adapt this presentation for educational purposes.
